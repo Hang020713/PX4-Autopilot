@@ -94,6 +94,13 @@ private:
 	bool		_pwm_initialized{false};
 	bool		_first_update_cycle{true};
 
+	// Frequency control parameters
+	bool 		_dynamic_pwm[MAX_IO_TIMERS]{}; // if true, frequency is controlled dynamically based on throttle
+	unsigned	_min_freq{30};      // Minimum frequency in Hz
+	unsigned	_max_freq{50};     // Maximum frequency in Hz
+	unsigned	_current_freq{30};  // Current frequency in Hz
+	unsigned	_prev_freq{30};     // Previous frequency to track changes
+
 	perf_counter_t	_cycle_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")};
 	perf_counter_t	_interval_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": interval")};
 };

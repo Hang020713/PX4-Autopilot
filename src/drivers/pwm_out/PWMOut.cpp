@@ -40,6 +40,7 @@ ModuleBase::Descriptor PWMOut::desc{task_spawn, custom_command, print_usage};
 PWMOut::PWMOut() :
 	OutputModuleInterface(MODULE_NAME, px4::wq_configurations::hp_default)
 {
+	// 1u << DIRECT_PWM_OUTPUT_CHANNELS) - 1 creates a bitmask with the first DIRECT_PWM_OUTPUT_CHANNELS bits set to 1
 	_pwm_mask = ((1u << DIRECT_PWM_OUTPUT_CHANNELS) - 1);
 	_mixing_output.setMaxNumOutputs(DIRECT_PWM_OUTPUT_CHANNELS);
 
@@ -62,6 +63,7 @@ bool PWMOut::update_pwm_out_state(bool on)
 
 		for (int timer = 0; timer < MAX_IO_TIMERS; ++timer) {
 			_timer_rates[timer] = -1;
+			_dynamic_pwm[timer] = false;
 
 			uint32_t channels = io_timer_get_group(timer);
 
@@ -69,6 +71,8 @@ bool PWMOut::update_pwm_out_state(bool on)
 				continue;
 			}
 
+
+			// Get pwm out config
 			char param_name[17];
 			snprintf(param_name, sizeof(param_name), "%s_TIM%u", _mixing_output.paramPrefix(), timer);
 
@@ -77,6 +81,11 @@ bool PWMOut::update_pwm_out_state(bool on)
 			param_get(handle, &tim_config);
 
 			if (tim_config > 0) {
+				// Check dynamic PWM enable
+				if(tim_config == 10) {
+					_dynamic_pwm[timer] = true;
+				}
+
 				_timer_rates[timer] = tim_config;
 
 			} else if (tim_config == -1) { // OneShot
@@ -129,16 +138,95 @@ bool PWMOut::update_pwm_out_state(bool on)
 
 bool PWMOut::updateOutputs(float outputs[MAX_ACTUATORS], unsigned num_outputs, unsigned num_control_groups_updated)
 {
-	/* output to the servos */
 	if (_pwm_initialized) {
-		for (size_t i = 0; i < num_outputs; i++) {
-			if (!_mixing_output.isFunctionSet(i)) {
-				// do not run any signal on disabled channels
-				outputs[i] = 0.f;
-			}
+		// Normalize first output (throttle) from range [1000, ~2000] to [0, 1]
+		float throttle_normalized = (outputs[0] - 1000.f) / 1000.f;
 
-			if (_pwm_mask & (1 << i)) {
-				up_pwm_servo_set(i, static_cast<uint16_t>(lroundf(outputs[i])));
+		// Limited to [0, 1], avoid out of range
+		throttle_normalized = math::constrain(throttle_normalized, 0.f, 1.f);
+
+		// Only process dynamic PWM if throttle is active (> 0)
+		if (throttle_normalized > 0.f) {
+			// Map normalized throttle [0, 1] to frequency range [_min_freq, _max_freq]
+			_current_freq = static_cast<unsigned>(_min_freq + (throttle_normalized * (_max_freq - _min_freq)));
+
+			// 50% duty cycle pulse width for dynamic PWM mode
+			uint16_t pulse_width_50pct = static_cast<uint16_t>(500000 / _current_freq);
+
+			for (size_t i = 0; i < num_outputs; i++) {
+				// Find which timer group this channel belongs to
+				int timer_group = -1;
+				for (int timer = 0; timer < MAX_IO_TIMERS; ++timer) {
+					uint32_t channels = io_timer_get_group(timer);
+					if (channels & (1 << i)) {
+						timer_group = timer;
+						break;
+					}
+				}
+
+				// Check if this channel's timer is in dynamic PWM mode
+				if (timer_group >= 0 && _dynamic_pwm[timer_group]) {
+					/* Dynamic PWM Mode: frequency controlled by throttle */
+					if (!_mixing_output.isFunctionSet(i)) {
+						// do not run any signal on disabled channels
+						continue;
+					}
+
+					if (_pwm_mask & (1 << i)) {
+						// Set 50% duty cycle pulse width
+						up_pwm_servo_set(i, pulse_width_50pct);
+					}
+
+					// Update frequency only once per timer group and only when it changes
+					if (_current_freq != _prev_freq && timer_group >= 0) {
+						up_pwm_servo_set_rate_group_update(timer_group, _current_freq);
+						_prev_freq = _current_freq;
+					}
+				}
+				else {
+					/* Normal PWM Mode: standard duty cycle control */
+					if (!_mixing_output.isFunctionSet(i)) {
+						// do not run any signal on disabled channels
+						outputs[i] = 0.f;
+					}
+
+					if (_pwm_mask & (1 << i)) {
+						up_pwm_servo_set(i, static_cast<uint16_t>(lroundf(outputs[i])));
+					}
+				}
+			}
+		}
+		else {
+			/* Throttle is OFF: turn off all dynamic PWM channels */
+			for (size_t i = 0; i < num_outputs; i++) {
+				// Find which timer group this channel belongs to
+				int timer_group = -1;
+				for (int timer = 0; timer < MAX_IO_TIMERS; ++timer) {
+					uint32_t channels = io_timer_get_group(timer);
+					if (channels & (1 << i)) {
+						timer_group = timer;
+						break;
+					}
+				}
+
+				// Check if this channel's timer is in dynamic PWM mode
+				if (timer_group >= 0 && _dynamic_pwm[timer_group]) {
+					// Disable dynamic PWM output by setting pulse to 0
+					if (_pwm_mask & (1 << i)) {
+						up_pwm_servo_set(i, 0);
+					}
+				}
+				else {
+					/* Normal PWM Mode: set outputs directly */
+					if (!_mixing_output.isFunctionSet(i)) {
+						// do not run any signal on disabled channels
+						outputs[i] = 0.f;
+					}
+
+					if (_pwm_mask & (1 << i)) {
+						up_pwm_servo_set(i, static_cast<uint16_t>(lroundf(outputs[i])));
+					}
+				}
 			}
 		}
 	}
