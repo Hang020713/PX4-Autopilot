@@ -706,13 +706,16 @@ bootloader_main(void)
 	 */
 #if defined(BOARD_VBUS)
 
-	if (px4_arch_gpioread(BOARD_VBUS) != 0) {
-		usb_connected = true;
-		/* don't try booting before we set up the bootloader */
-		try_boot = false;
-	}
+	// if (px4_arch_gpioread(BOARD_VBUS) != 0) {
+	// 	usb_connected = true;
+	// 	/* don't try booting before we set up the bootloader */
+	// 	try_boot = false;
+	// }
+	usb_connected = true;
+	try_boot = false;
 
 #else
+	usb_connected = true;
 	try_boot = false;
 
 #endif

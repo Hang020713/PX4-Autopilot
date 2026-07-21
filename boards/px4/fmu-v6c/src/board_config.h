@@ -202,6 +202,8 @@
  * PA9  OTG_FS_VBUS VBUS sensing
  */
 #define GPIO_OTGFS_VBUS         /* PA9 */ (GPIO_INPUT|GPIO_PULLDOWN|GPIO_SPEED_100MHz|GPIO_PORTA|GPIO_PIN9)
+#define BOARD_USB_VBUS_SENSE_DISABLED 1
+// #define GPIO_OTGFS_VBUS 0
 
 /* High-resolution timer */
 #define HRT_TIMER               8  /* use timer8 for the HRT */
@@ -231,8 +233,10 @@
  * this board support the ADC system_power interface, and therefore
  * provides the true logic GPIO BOARD_ADC_xxxx macros.
  */
-#define BOARD_ADC_USB_CONNECTED (px4_arch_gpioread(GPIO_OTGFS_VBUS))
-#define BOARD_ADC_USB_VALID     (!px4_arch_gpioread(GPIO_nVDD_USB_VALID))
+// #define BOARD_ADC_USB_CONNECTED (px4_arch_gpioread(GPIO_OTGFS_VBUS))
+// #define BOARD_ADC_USB_VALID     (!px4_arch_gpioread(GPIO_nVDD_USB_VALID))
+#define BOARD_ADC_USB_CONNECTED (1)
+#define BOARD_ADC_USB_VALID     BOARD_ADC_USB_CONNECTED
 
 /* FMUv6C never powers off the Servo rail */
 
