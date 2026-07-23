@@ -1,0 +1,5 @@
+menuconfig MODULES_BOAT_ALLOC
+    bool "boat_alloc"
+    default n
+    ---help---
+        Custom azimuth-thruster allocation for twin-thruster ship

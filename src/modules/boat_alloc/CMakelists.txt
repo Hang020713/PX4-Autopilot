@@ -1,0 +1,9 @@
+px4_add_module(
+    MODULE modules__boat_alloc
+    MAIN boat_alloc
+    SRCS
+        BoatAlloc.cpp
+        BoatAlloc.hpp
+    DEPENDS
+        px4_work_queue
+)

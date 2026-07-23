@@ -1,0 +1,24 @@
+#!/bin/sh
+#
+# @name My Custom Twin-Thruster Boat
+#
+# @type Rover
+# @class Rover
+#
+# @maintainer You <you@example.com>
+#
+
+. ${R}etc/init.d/rc.rover_differential_defaults
+
+# tell the system how many motors / servos we output
+param set-default CA_ROTOR_COUNT 2
+param set-default CA_SV_CS_COUNT 2
+
+param set-default PWM_MAIN_MIN 500
+param set-default PWM_MAIN_MAX 2500
+param set-default PWM_MAIN_DISARM 1500
+
+control_allocator start
+
+boat_alloc start
+# rover_differential stop

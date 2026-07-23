@@ -4,4 +4,4 @@
 . ${R}etc/init.d/rc.rover
 
 # Start rover differential module.
-rover_differential start
+# rover_differential start  
